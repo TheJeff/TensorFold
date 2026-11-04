@@ -234,4 +234,5 @@ test {
 
 test {
     _ = @import("models_idle_audit_test.zig");
+    _ = @import("thinking_request_test.zig");
 }
