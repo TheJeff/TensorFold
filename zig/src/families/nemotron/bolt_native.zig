@@ -148,13 +148,15 @@ const Engine = struct {
     }
 
     /// One piece of the prompt pass, cut at the cache's marks, small enough that a cancel lands quickly.
-    fn prefillStep(ptr: *anyopaque, s: *lanes.Stream) !bool {
+    /// `max_rows` caps the piece when the lane host budgets it (0: uncapped).
+    fn prefillStep(ptr: *anyopaque, s: *lanes.Stream, max_rows: u32) !bool {
         const e: *Engine = @ptrCast(@alignCast(ptr));
         const prompt_len = s.prompt().len;
         const slot = e.slots.get(s) orelse try e.begin(s);
         if (s.isCancelled() or s.yields()) return error.Cancelled;
         if (slot.at >= prompt_len) return true;
-        const rows: usize = if (e.decoding > 0) busy_piece_rows else piece_rows;
+        const natural: usize = if (e.decoding > 0) busy_piece_rows else piece_rows;
+        const rows: usize = if (max_rows == 0) natural else @min(natural, @as(usize, max_rows));
         var end = @min(prompt_len, slot.at + rows);
         for (s.reuse.marks) |m| {
             if (m > slot.at and m < end) end = m;
@@ -206,7 +208,7 @@ const Engine = struct {
     }
 
     fn prefill(ptr: *anyopaque, s: *lanes.Stream) !void {
-        while (!try prefillStep(ptr, s)) {}
+        while (!try prefillStep(ptr, s, 0)) {}
     }
 
     /// A cancelled prompt pass keeps the prefix it had done: the cache's hook saves the sequence's state at that row
