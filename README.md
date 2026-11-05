@@ -1,5 +1,41 @@
 # TensorFold
 
+> **This fork advances TensorFold on the NVIDIA RTX Spark N1X** — Windows 11 ARM64, `sm_121`,
+> WDDM unified memory — and carries the Nemotron 3.5 Bolt lane that upstream does not build.
+> Upstream is [ashhart/TensorFold](https://github.com/ashhart/TensorFold); this fork follows it by
+> re-porting onto release tags, not by merging `main`. Branch contents and pins are in
+> [FORK.md](FORK.md); the Windows notes are in [docs/WINDOWS.md](docs/WINDOWS.md).
+
+## What is different from upstream
+
+- **The Nemotron 3.5 Bolt lane (`nemotron_h_puzzle`).** The recipe's libbolt backend: the `bolt`
+  build step (`zig/build/bolt.zig`), the lane backend (`zig/src/families/nemotron/bolt_native.zig`),
+  its DLL loader (`bolt_api.zig`) and `zig/tests/bolt_lib_compile.zig`, plus the `nemotron_h_puzzle`
+  registration in the CUDA registry, the hub's family title and the server's detection of the omni
+  wrapper's `model_type`. Upstream reads puzzle configs but has no libbolt backend, so it cannot
+  serve Bolt on CUDA.
+- **A Windows ARM64 build of that lane.** `bolt.dll` is built beside the server from the recipe's
+  `engine/` with MSVC ARM64 and CUDA 13.4, and loaded through `bolt_api.zig`.
+- **A branch that re-ports onto upstream.** `win-arm64/v1.2.3` is upstream v1.2.3 plus the above,
+  with the lane vtable's `prefill_step` `max_rows` budget honoured; it builds and serves on the N1X.
+  `main` is the v1.1.6 baseline that is served today.
+- **Grammar on Windows.** `tfgrammar.dll` is upstream from v1.2.1 onward; `main` carries the same
+  name change itself.
+- **Not yet on Windows ARM64.** JPEG (`turbojpeg.dll`), WebP (`libwebpdecoder`) and video
+  (`tfvideo.dll` with FFmpeg 9.0.2). Text, structured output and tool calls work.
+- **Unchanged.** Metal, Linux/CUDA, the CLI and HTTP API, and every other family; upstream's commits
+  are kept intact.
+
+Build on Windows ARM64 (Zig 0.17.0, CUDA 13.4, xgrammar v0.2.8 pinned):
+
+```bat
+zig build native bolt install -Dsm=121 -Dstrip=true ^
+  -Dnvcc="%CUDA_PATH%\bin\nvcc.exe" ^
+  -Dbolt-src="<bolt-recipe>\engine"
+```
+
+---
+
 TensorFold serves language models from a Zig binary on Apple Silicon and NVIDIA GPUs.
 The engine reads checkpoints, tokenizes requests and runs Metal or CUDA kernels directly.
 Serving needs no Python or MLX installation.
