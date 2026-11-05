@@ -240,6 +240,7 @@ pub fn build(b: *std.Build) void {
     @import("zig/build/dev_tools.zig").wire(b, target);
     @import("zig/build/profile.zig").wire(b, test_step);
     @import("zig/build/test_reads.zig").wire(b); // last: it adds to the steps everything above declared
+    @import("zig/build/rerun_tests.zig").wire(b); // probe only
 }
 
 /// The native Metal server build is owned by the shared Metal target module.
