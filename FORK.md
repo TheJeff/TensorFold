@@ -9,6 +9,7 @@ Fork of [ashhart/TensorFold](https://github.com/ashhart/TensorFold) that carries
 | --- | --- |
 | `main` | Working baseline: upstream **v1.1.6** (`eea9dc9c`) plus the Bolt recipe's `0002-register-bolt` patch and the Windows `tfgrammar.dll` name. This is what is built and served today. |
 | `win-arm64/v1.2.3` | Re-port onto upstream **v1.2.3**. Upstream now ships the Windows grammar library itself (from v1.2.1), so only the Bolt recipe patch is carried. Builds and serves on the N1X (see below). |
+| `win-arm64/v1.2.6` | Re-port onto upstream **v1.2.6** (2026-11-10). Builds and serves on the N1X; the A/B against v1.2.3 is in the parent repo's `BENCH-1.2.6.md`. Registry moved to `native/cuda_families.zig`, so `nemotron.bolt` is registered there. |
 
 Upstream `main` is far ahead of `main` here; do not merge it into `main`, re-port onto a release tag
 in the `win-arm64/*` branch instead.
@@ -36,6 +37,22 @@ zig build native bolt install -Dsm=121 -Dstrip=true ^
 
 The server is `zig-out\native\bin\tensorfold-native.exe`; `bolt.dll` is built into `zig-out\native\lib`
 beside it. Upstream's Windows notes are in `docs/WINDOWS.md`.
+
+## Status of `win-arm64/v1.2.6`
+
+`zig build native bolt install -Dsm=121` succeeds, first attempt, with Zig 0.17.0, CUDA 13.4.59 and
+MSVC ARM64. Re-applying the v1.2.3 delta with `git apply --3way` left two structural conflicts and
+no semantic ones: `zig/build/cuda.zig` lost `golden.zig` upstream (its step moved to
+`cuda_server_host.zig`), so only the `bolt_build` import and `bolt_build.steps(b, nvcc)` call were
+re-added; and the CUDA family registry moved into `zig/src/native/cuda_families.zig`, so
+`nemotron.bolt` is registered there. The lane vtable is byte-identical to v1.2.3, so
+`bolt_native.zig` needed no work.
+
+Verified on the N1X: Qwen3.8 Flash Next FP4 loads in 35-42 s at 80.8 GiB and serves with replies
+identical to v1.2.3 (same `primes` hash on every run); Nemotron 3.5 Bolt loads in 25.2 s and answers
+through libbolt. Speed against v1.2.3, warm page cache: cold prefill level (2K +6%, 8K −1%, 32K
++1%), single-stream decode level, 8 concurrent streams **+3.7%**. Full receipts, method and the
+page-cache trap that fakes a 25% prefill win: `BENCH-1.2.6.md` in the parent repo.
 
 ## Status of `win-arm64/v1.2.3`
 
