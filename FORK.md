@@ -10,6 +10,7 @@ Fork of [ashhart/TensorFold](https://github.com/ashhart/TensorFold) that carries
 | `main` | Working baseline: upstream **v1.1.6** (`eea9dc9c`) plus the Bolt recipe's `0002-register-bolt` patch and the Windows `tfgrammar.dll` name. This is what is built and served today. |
 | `win-arm64/v1.2.3` | Re-port onto upstream **v1.2.3**. Upstream now ships the Windows grammar library itself (from v1.2.1), so only the Bolt recipe patch is carried. Builds and serves on the N1X (see below). |
 | `win-arm64/v1.2.6` | Re-port onto upstream **v1.2.6** (2026-11-10). Builds and serves on the N1X; the A/B against v1.2.3 is in the parent repo's `BENCH-1.2.6.md`. Registry moved to `native/cuda_families.zig`, so `nemotron.bolt` is registered there. |
+| `win-arm64/v1.2.7` | Re-port onto upstream **v1.2.7** (`93a2e93e`, 2026-11-19) plus MiaAI-Lab's five Flash-Next patches (MIT; parent repo `local-patches/mia-v1.2.7/`). Zero conflicts. Builds and serves on the N1X; PDF input and the stock quantised vision tower work; fp8 KV admits 5 full 262k streams. Receipts: parent repo's `UPSTREAM-1.2.7.md`, `BENCH-1.2.7.md`, `MIA-V127-REVIEW.md`. |
 
 Upstream `main` is far ahead of `main` here; do not merge it into `main`, re-port onto a release tag
 in the `win-arm64/*` branch instead.
@@ -37,6 +38,26 @@ zig build native bolt install -Dsm=121 -Dstrip=true ^
 
 The server is `zig-out\native\bin\tensorfold-native.exe`; `bolt.dll` is built into `zig-out\native\lib`
 beside it. Upstream's Windows notes are in `docs/WINDOWS.md`.
+
+## Status of `win-arm64/v1.2.7`
+
+The v1.2.6 delta applied onto `v1.2.7` with **zero conflicts** (the lane vtable, `build/cuda.zig`,
+the family registry, `optional_libraries.zig`, `grammar.zig` and `server/cli.zig` are
+byte-identical between the tags), then MiaAI-Lab's patches 0001-0005 as five commits: quantised
+vision towers decode to bf16 at load (0001), 16k per-request image budget (0002), opt-in
+`--kv-cache fp8` (0003), the MXFP8 prompt tile, default on, `TF_FLASHNEXT_PROMPT_MX128=0` off
+(0004), and the video wiring, inert until `tfvideo.dll` exists (0005).
+
+Built first attempt via the parent repo's `build-bolt-127.bat` (7.5 min, warm cache). Host gates:
+codec diagnostics 12/12, vision-weights 16/16 (incl. 0001's quant tests), `check-native-cuda-host`
+OK. Serve gate on the N1X: **0 failed, 0 warned** including PDF (`document.pdf` read back as
+`PDFIUM-OK`, `corrupt.pdf` refused 400); the **stock unspliced** FP4-Local loads with `--vision`
+(77.65 GiB, 55.9 s). fp8 KV admits **5 full 262,144-token streams** (4.72 GiB each vs bf16's 7.86,
+which caps at 3); a 255,002-token needle is found on both dtypes. A/B vs v1.2.6 (power-capped
+1761 MHz, cold n-gram cache after the 11-18 reboot — absolutes not comparable to BENCH-1.2.6's
+warm day): prefill +1-5%, single-stream decode level, **8-stream +6.4% at 384-token replies**,
+replies bit-identical. Bolt loads ~22 s and passes a strict `json_schema` through the copied
+`tfgrammar.dll`. Full method and per-run JSON: parent repo's `BENCH-1.2.7.md`.
 
 ## Status of `win-arm64/v1.2.6`
 
@@ -66,6 +87,8 @@ itself is unchanged (the recipe's engine sources are), so the cached artifact is
 
 ## Not done yet
 
-JPEG (`turbojpeg.dll`), WebP (`libwebpdecoder`) and video (`tfvideo.dll` + FFmpeg) are not built for
-Windows ARM64 yet; plain text, structured output and tool calls are. See the recipe repo's
-`NEXT-STEPS.md`.
+JPEG (`turbojpeg.dll` 3.1.4.1) and WebP (`libwebpdecoder.dll` 1.6.0) are built and pixel-exact
+(parent repo `build-jpeg.bat` / `build-webp.bat`, 2026-11-17). PDF (`pdfium.dll` from the
+pypdfium2 5.14.0 win_arm64 wheel) works on `win-arm64/v1.2.7` (2026-11-19). **Video**
+(`tfvideo.dll` + FFmpeg 9.0.2 for winarm64) is still not built; the 0005 wiring is in the branch
+and inert until the DLL exists. See the parent repo's `NEXT-STEPS.md` item 3.
