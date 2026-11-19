@@ -5,7 +5,7 @@ const lanes = @import("lanes");
 const vision = @import("qwen_cuda.zig");
 /// The image rows one request holds in all (each image keeps one tower call's 4,096 at most).
 pub const max_image_tokens = 16384;
-pub const Limits = struct { image_tokens: u32 = 4096, max_images: u32 = 4 };
+pub const Limits = struct { image_tokens: u32 = 4096, max_images: u32 = 4, video_tokens: u32 = 0, max_videos: u32 = 0, max_frames: u32 = 0 };
 pub fn checkLimits(l: Limits) !void {
     if (l.image_tokens == 0 or l.image_tokens > max_image_tokens or l.max_images == 0 or l.max_images > 64)
         return error.BadImageLimits;
@@ -66,16 +66,20 @@ pub fn placeholders(a: std.mem.Allocator, c: vision.Config, ids: []const u32, im
     errdefer p.deinit();
     var j: usize = 0;
     for (ids, 0..) |id, at| {
-        if (c.video_token) |video| if (id == video) return error.QwenVideoUnsupported;
         if (j < p.runs.len and at == p.runs[j].at) {
             const r = p.runs[j];
             const im = images[j];
             if (im.tokens != r.tokens() or im.pixels.len != r.patches() * vision.patch_width) return error.BadImagePatches;
             if (ids[at - 1] != c.vision_start or ids[at + r.tokens()] != c.vision_end) return error.BadImagePlaceholders;
-            for (ids[at..][0..r.tokens()]) |x| if (x != c.image_token) return error.BadImagePlaceholders;
+            // an image group's rows are <|image_pad|>; a video group's are <|video_pad|>
+            const mark = ids[at];
+            if (mark != c.image_token and (c.video_token == null or mark != c.video_token.?))
+                return error.BadImagePlaceholders;
+            for (ids[at..][0..r.tokens()]) |x| if (x != mark) return error.BadImagePlaceholders;
             j += 1;
         }
-        if (id == c.image_token and p.src[at] < 0) return error.BadImagePlaceholders;
+        if ((id == c.image_token or (c.video_token != null and id == c.video_token.?)) and p.src[at] < 0)
+            return error.BadImagePlaceholders;
     }
     return p;
 }
