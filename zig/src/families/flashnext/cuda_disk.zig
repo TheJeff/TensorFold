@@ -167,6 +167,7 @@ pub fn policyOf(c: anytype) [13]u64 {
     grids.update(std.mem.asBytes(&k.fp8.resident));
     if (k.expert_tile) |x| grids.update(std.mem.asBytes(&x.resident));
     grids.update(std.mem.asBytes(&k.native_lane.prompt_sms)); // a BF16 prompt tile runs over half these SMs' worth
+    grids.update(std.mem.asBytes(&f.mx_min_n)); // TF_FLASHNEXT_PROMPT_MX128: the MXFP8 projections on the relaxed prompt tile
     return .{
         // TF_FLASHNEXT_CHUNK_SOLO and _CHUNK as resolved: a pass's rows alone, and beside a decoding stream
         e.chunk,
