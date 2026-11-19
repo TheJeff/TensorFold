@@ -15,7 +15,7 @@ venv/
 .zig-toolchain
 .zig-cache/
 zig-out/
-zig-out-v126/
+zig-out-*/
 
 # Native Qwen CPU-only Metal compiler receipts.
 .q27-metal-check/
